@@ -31,6 +31,36 @@ export class TickerTracker {
   private bybitPingInterval?: ReturnType<typeof setInterval>;
   private validated = false;
 
+  private _priceHistory: number[] = [];
+  private _atrHistory: number[] = [];
+  private _atrValue = 0;
+
+  get atr() { return this._atrValue; }
+
+  get isHighVolatility(): boolean { return this._atrValue > 8; }
+
+  get marketState(): "OSCILLATING" | "TRENDING" | "HOT" | "KILLSWITCH" {
+    if (this.isKillswitch) return "KILLSWITCH";
+    if (this._atrValue < 1.5) return "OSCILLATING";
+    if (this._atrValue > 6) return "HOT";
+    return "TRENDING";
+  }
+
+  private _updateATR(price: number): void {
+    this._priceHistory.push(price);
+    if (this._priceHistory.length > 14) this._priceHistory.shift();
+    if (this._priceHistory.length < 2) return;
+
+    const prev = this._priceHistory[this._priceHistory.length - 2]!;
+    const curr = this._priceHistory[this._priceHistory.length - 1]!;
+    const tr = Math.abs(curr - prev);
+    this._atrHistory.push(tr);
+    if (this._atrHistory.length > 7) this._atrHistory.shift();
+
+    this._atrValue = this._atrHistory.reduce((s, v) => s + v, 0)
+      / this._atrHistory.length;
+  }
+
   get price() {
     return this.polymarketValue ?? this.binanceValue ?? this.coinbaseValue;
   }
@@ -146,6 +176,7 @@ export class TickerTracker {
         }
 
         this.binanceValue = price;
+        this._updateATR(price);
       },
       onerror: (err) => console.error("Binance WS error:", err),
     });
@@ -172,6 +203,7 @@ export class TickerTracker {
         const price = parseFloat(json.price);
         if (!price) return;
         this.coinbaseValue = price;
+        this._updateATR(price);
       },
       onerror: (err) => console.error("Coinbase WS error:", err),
     });

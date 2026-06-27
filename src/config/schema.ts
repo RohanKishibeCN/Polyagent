@@ -19,8 +19,8 @@ export const ConfigSchema = z.object({
   WALLET_BALANCE: z.coerce.number().positive().default(50),
   MAX_SESSION_LOSS: z.coerce.number().positive().default(3),
 
-  STRATEGY: z.enum(["simulation", "late-entry", "ai-decision"])
-    .default("simulation"),
+  STRATEGY: z.enum(["simulation", "late-entry", "ai-decision", "scalp", "combo"])
+    .default("combo"),
 
   SIM_BUY_PRICE: z.coerce.number().min(0.01).max(0.99).default(0.49),
   SIM_SELL_PRICE: z.coerce.number().min(0.01).max(0.99).default(0.70),
@@ -33,6 +33,18 @@ export const ConfigSchema = z.object({
   LATE_ENTRY_ATR_MAX: z.coerce.number().positive().default(2),
   LATE_ENTRY_CERTAINTY: z.coerce.number().min(0.5).max(0.99).default(0.85),
   LATE_ENTRY_MIN_LIQUIDITY: z.coerce.number().positive().default(20),
+
+  ATR_OSCILLATE_MAX: z.coerce.number().positive().default(1.5),
+  ATR_HOT_MIN: z.coerce.number().positive().default(6.0),
+
+  SCALP_MAX_PER_WINDOW: z.coerce.number().int().positive().default(5),
+  SCALP_TP_PCT: z.coerce.number().min(0.01).max(0.5).default(0.10),
+  SCALP_SL_PCT: z.coerce.number().min(0.01).max(0.5).default(0.06),
+  SCALP_ENTRY_MIN: z.coerce.number().min(0.01).max(0.49).default(0.42),
+  SCALP_ENTRY_MAX: z.coerce.number().min(0.51).max(0.99).default(0.58),
+  SCALP_SPREAD_MAX: z.coerce.number().min(0).max(0.10).default(0.03),
+  SCALP_MIN_REMAINING_SEC: z.coerce.number().int().positive().default(180),
+  SCALP_MAX_CONSEC_LOSS: z.coerce.number().int().positive().default(2),
 
   AI_API_KEY: z.string().optional().default(""),
   AI_MODEL: z.string().default("gpt-4o"),
@@ -78,7 +90,7 @@ export const ConfigSchema = z.object({
 
   TELEGRAM_BOT_TOKEN: z.string().optional().default(""),
   TELEGRAM_CHAT_ID: z.string().optional().default(""),
-  DISCORD_WEBHOOK_URL: z.string().url().optional().default(""),
+  DISCORD_WEBHOOK_URL: z.string().optional().default(""),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
