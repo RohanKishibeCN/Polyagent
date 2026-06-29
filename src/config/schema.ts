@@ -55,7 +55,7 @@ export const ConfigSchema = z.object({
 
   MAX_NOTIONAL_USD: z.coerce.number().positive().default(5),
   MAX_DAILY_TRADES: z.coerce.number().int().positive().default(200),
-  MAX_POSITION_USD: z.coerce.number().positive().default(200),
+  MAX_POSITION_USD: z.coerce.number().positive().default(5),
   SLIPPAGE_BPS: z.coerce.number().int().nonnegative().default(30),
   DAILY_MAX_LOSS_PCT: z.coerce.number().min(0).max(1).default(0.05),
   MAX_DRAWDOWN_PCT: z.coerce.number().min(0).max(1).default(0.25),
