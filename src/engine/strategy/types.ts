@@ -60,6 +60,8 @@ export type StrategyContext = {
   }>;
 
   ticker: TickerTracker;
+  /** Current available wallet balance (balance minus reserved for buys). */
+  walletAvailable: number;
   /** Read-only access to market open/close price data when available. */
   getMarketResult: () => MarketData | undefined;
 };

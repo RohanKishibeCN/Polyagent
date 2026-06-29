@@ -353,6 +353,7 @@ export class MarketLifecycle {
         };
       },
       ticker: this._ticker,
+      walletAvailable: this._tracker.available,
       getMarketResult: () => {
         const slot = slotFromSlug(this.slug);
         return this.apiQueue.marketResult.get(slot.startTime);

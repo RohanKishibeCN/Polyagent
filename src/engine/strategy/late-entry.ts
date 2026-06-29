@@ -210,9 +210,15 @@ type LateEntryState = {
 };
 
 // ---------------------------------------------------------------------------
-// Entry parameters read from Config at call time
+// Position sizing — dynamic, based on current wallet balance
 // ---------------------------------------------------------------------------
-function getShares(): number { return Config.get().LATE_ENTRY_SHARES; }
+function getShares(balance: number): number {
+  const cfg = Config.get();
+  if (balance <= 0) return 1;
+  const riskBased = balance * cfg.POSITION_PCT;
+  const capped = Math.min(riskBased, cfg.MAX_POSITION_USD);
+  return Math.max(1, Math.round(capped));
+}
 function getGapSafety(): number { return Config.get().LATE_ENTRY_GAP_SAFETY; }
 function getDivergenceMax(): number { return Config.get().LATE_ENTRY_DIVERGENCE; }
 function getATRMax(): number { return Config.get().LATE_ENTRY_ATR_MAX; }
@@ -298,7 +304,7 @@ function placeEntry(
 
   ctx.postOrders([
     {
-      req: { tokenId, action: "buy", price: signal.ask, shares: getShares() },
+      req: { tokenId, action: "buy", price: signal.ask, shares: getShares(ctx.walletAvailable) },
       expireAtMs: ctx.slotEndMs,
       onFilled(filledShares) {
         state.position = {

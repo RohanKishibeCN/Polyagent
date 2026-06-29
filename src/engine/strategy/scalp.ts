@@ -32,12 +32,17 @@ export const scalpStrategy: Strategy = async (ctx) => {
   const entryMax = cfg.SCALP_ENTRY_MAX;
 
   function calcPositionSize(): number {
+    const balance = ctx.walletAvailable;
+    if (balance <= 0) return 1;
+
     const rawAtr = ctx.ticker.atr || 3;
     const atr = Math.max(0.5, rawAtr);
     const volRatio = Math.min(1.5, atr / 3.0);
-    const size = cfg.MAX_POSITION_USD * volRatio * 0.20;
-    const maxPerTrade = cfg.WALLET_BALANCE * 0.20;
-    return Math.max(1, Math.min(Math.round(size), Math.round(maxPerTrade)));
+
+    const riskBased = balance * cfg.POSITION_PCT * volRatio;
+    const capped = Math.min(riskBased, cfg.MAX_POSITION_USD);
+
+    return Math.max(1, Math.round(capped));
   }
 
   function tryScalp(): void {

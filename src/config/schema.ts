@@ -59,6 +59,7 @@ export const ConfigSchema = z.object({
   SLIPPAGE_BPS: z.coerce.number().int().nonnegative().default(30),
   DAILY_MAX_LOSS_PCT: z.coerce.number().min(0).max(1).default(0.05),
   MAX_DRAWDOWN_PCT: z.coerce.number().min(0).max(1).default(0.25),
+  POSITION_PCT: z.coerce.number().min(0.01).max(0.5).default(0.05),
 
   KILLSWITCH_THRESHOLD: z.coerce.number().positive().default(50.0),
   WHALE_DUMP_THRESHOLD_PCT: z.coerce.number().positive().default(0.0015),
