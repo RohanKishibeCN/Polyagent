@@ -59,7 +59,7 @@ export class OrderBook {
     this.feeRates.clear();
 
     this.ws = new WebSocket(
-      process.env.ORDERBOOK_WS_URL ?? DEFAULT_WS_URL,
+      process.env.ORDERBOOK_WS_URL || DEFAULT_WS_URL,
     );
 
     this.ws.onopen = () => this.sendSubscription();
