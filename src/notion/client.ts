@@ -1,4 +1,4 @@
-import { execSync } from "child_process";
+const NOTION_API_BASE = "https://api.notion.com/v1";
 
 export class NotionClient {
   private apiKey: string;
@@ -9,32 +9,39 @@ export class NotionClient {
     this.databaseId = databaseId;
   }
 
-  private ntnApi(path: string, method = "GET", body?: object): any {
-    const args = [`ntn`, `api`, path];
-    if (method !== "GET") args.push("-X", method);
-    if (body) args.push("-d", JSON.stringify(body));
-    args.push("--quiet");
+  private async notionApi(path: string, method = "GET", body?: object): Promise<any> {
+    const url = `${NOTION_API_BASE}${path}`;
+    const headers: Record<string, string> = {
+      "Authorization": `Bearer ${this.apiKey}`,
+      "Content-Type": "application/json",
+      "Notion-Version": "2022-06-28",
+    };
 
-    const result = execSync(args.join(" "), {
-      encoding: "utf8",
-      env: { ...process.env, NOTION_API_TOKEN: this.apiKey },
-      maxBuffer: 10 * 1024 * 1024,
+    const res = await fetch(url, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
     });
-    try { return JSON.parse(result); } catch { return result; }
+
+    const data: any = await res.json();
+    if (!res.ok) {
+      console.error(`[notion] API error ${res.status}: ${JSON.stringify(data)}`);
+      throw new Error(`Notion API error: ${res.status} ${data.message ?? JSON.stringify(data)}`);
+    }
+    return data;
   }
 
   async createDailyPage(dateStr: string, summaryText: string): Promise<string> {
     const body = {
       parent: { database_id: this.databaseId },
       properties: {
-        "Date": { title: [{ text: { content: dateStr } }] },
-        "Daily Summary": {
-          rich_text: [{ text: { content: summaryText } }]
-        },
+        "Title": { title: [{ text: { content: `Daily Report — ${dateStr}` } }] },
+        "Date": { date: { start: dateStr } },
+        "Content": { rich_text: [{ text: { content: summaryText } }] },
       },
     };
 
-    const response = this.ntnApi("v1/pages", "POST", body);
+    const response = await this.notionApi("/pages", "POST", body);
     return response.id;
   }
 }
