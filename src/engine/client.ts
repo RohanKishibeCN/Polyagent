@@ -335,6 +335,7 @@ function mapStatus(status: string): Order["status"] {
     case "delayed":
       return "delayed";
     default:
+      console.error(`[client] Unknown order status: "${status}" — treating as cancelled`);
       return "cancelled";
   }
 }

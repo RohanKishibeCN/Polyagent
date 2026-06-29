@@ -336,6 +336,7 @@ export class PolymarketUserChannel extends UserChannelBase {
 
 export class SimUserChannel extends UserChannelBase {
   private _interval: ReturnType<typeof setInterval> | null = null;
+  private _timers: ReturnType<typeof setTimeout>[] = [];
   private readonly _getBook: (tokenId: string) => BookSnapshot;
   private readonly _cancelCallbacks: Map<string, () => void> | null;
 
@@ -398,7 +399,8 @@ export class SimUserChannel extends UserChannelBase {
       // Schedule trade MINED after the simulated on-chain settlement delay.
       // Read at call time so tests can control it via process.env.SIM_BALANCE_DELAY_MS.
       const delay = parseInt(process.env.SIM_BALANCE_DELAY_MS ?? "4000", 10);
-      setTimeout(() => {
+      const timer = setTimeout(() => {
+        this._timers = this._timers.filter((t) => t !== timer);
         this.processTradeEvent({
           id: tradeId,
           status: "MINED",
@@ -409,10 +411,13 @@ export class SimUserChannel extends UserChannelBase {
           ],
         });
       }, delay);
+      this._timers.push(timer);
     }
   }
 
   destroy(): void {
+    for (const t of this._timers) clearTimeout(t);
+    this._timers = [];
     if (this._interval) {
       clearInterval(this._interval);
       this._interval = null;

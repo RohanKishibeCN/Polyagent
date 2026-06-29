@@ -140,7 +140,8 @@ export class DailyReporter {
 
   static loadState(): any {
     try {
-      const path = join("state", "polyagent.json");
+      const prodSuffix = Config.get().PROD ? "-prod" : "";
+      const path = join("state", `polyagent${prodSuffix}.json`);
       return JSON.parse(readFileSync(path, "utf8"));
     } catch {
       return { completedMarkets: [], startedAt: new Date().toISOString() };

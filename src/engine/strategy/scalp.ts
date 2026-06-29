@@ -32,7 +32,8 @@ export const scalpStrategy: Strategy = async (ctx) => {
   const entryMax = cfg.SCALP_ENTRY_MAX;
 
   function calcPositionSize(): number {
-    const atr = ctx.ticker.atr || 3;
+    const rawAtr = ctx.ticker.atr || 3;
+    const atr = rawAtr < 0.1 ? 0.1 : rawAtr;
     const volMultiplier = atr / 3.0;
     const safeMultiplier = Math.max(0.5, Math.min(2.0, 1 / volMultiplier));
     const size = cfg.MAX_POSITION_USD * safeMultiplier * 0.20;

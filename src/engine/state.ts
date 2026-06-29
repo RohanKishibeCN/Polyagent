@@ -22,6 +22,7 @@ export type CompletedMarketState = {
 export type PersistentState = {
   sessionPnl: number;
   sessionLoss?: number;
+  startedAt?: string;
   activeMarkets: MarketState[];
   completedMarkets: CompletedMarketState[];
 };

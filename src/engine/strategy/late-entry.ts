@@ -210,10 +210,17 @@ type LateEntryState = {
 };
 
 // ---------------------------------------------------------------------------
-// Constants
+// Entry parameters read from Config at call time
 // ---------------------------------------------------------------------------
+function getShares(): number { return Config.get().LATE_ENTRY_SHARES; }
+function getGapSafety(): number { return Config.get().LATE_ENTRY_GAP_SAFETY; }
+function getDivergenceMax(): number { return Config.get().LATE_ENTRY_DIVERGENCE; }
+function getATRMax(): number { return Config.get().LATE_ENTRY_ATR_MAX; }
+function getCertaintyMin(): number { return Config.get().LATE_ENTRY_CERTAINTY; }
+function getMinLiquidity(): number { return Config.get().LATE_ENTRY_MIN_LIQUIDITY; }
+function getConfigPeakGap(): number { return Config.get().LATE_ENTRY_PEAK_GAP_RATIO; }
 
-const SHARES = 6;
+import { Config } from "../../config";
 
 function checkEntry(params: {
   remaining: number;
@@ -248,21 +255,21 @@ function checkEntry(params: {
   if (
     remaining <= 90 &&
     atr &&
-    atr <= 2 &&
+    atr <= getATRMax() &&
     gapSafety &&
-    gapSafety >= 40 &&
-    divergence <= 10 &&
+    gapSafety >= getGapSafety() &&
+    divergence <= getDivergenceMax() &&
     peakGapRatio &&
-    peakGapRatio >= 0.75
+    peakGapRatio >= getConfigPeakGap()
   ) {
-    const upCertain = up != null && up.price > 0.85;
-    const downCertain = down != null && down.price > 0.85;
+    const upCertain = up != null && up.price > getCertaintyMin();
+    const downCertain = down != null && down.price > getCertaintyMin();
 
     if (upCertain || downCertain) {
       const side: "UP" | "DOWN" = upCertain ? "UP" : "DOWN";
       const info = (side === "UP" ? up : down)!;
 
-      if (info.liquidity < 20) return null;
+      if (info.liquidity < getMinLiquidity()) return null;
 
       return {
         side,
@@ -291,7 +298,7 @@ function placeEntry(
 
   ctx.postOrders([
     {
-      req: { tokenId, action: "buy", price: signal.ask, shares: SHARES },
+      req: { tokenId, action: "buy", price: signal.ask, shares: getShares() },
       expireAtMs: ctx.slotEndMs,
       onFilled(filledShares) {
         state.position = {
@@ -495,5 +502,5 @@ export const lateEntry: Strategy = async (ctx) => {
     if (state.position && !state.stopLossFired) {
       checkStopLoss(ctx, state, remaining, gap, indicators.rsi);
     }
-  }, 0);
+  }, 500);
 };

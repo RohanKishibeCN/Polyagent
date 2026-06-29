@@ -102,6 +102,7 @@ async function recoverMarket(
         shares: order.shares,
         fee: 0,
         tokenId: order.tokenId,
+        status: "filled",
       });
     } else if (status?.status === "live") {
       stillPending.push({

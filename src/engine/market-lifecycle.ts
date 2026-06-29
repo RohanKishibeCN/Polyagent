@@ -36,6 +36,7 @@ export type CompletedOrder = {
   shares: number;
   fee: number;
   tokenId: string;
+  status: string;
 };
 
 /** Serializable subset of PendingOrder (no callbacks). */
@@ -452,7 +453,8 @@ export class MarketLifecycle {
    */
   private async _checkExpiries(): Promise<void> {
     const now = Date.now();
-    for (const pending of this._pendingOrders) {
+    const snapshot = [...this._pendingOrders];
+    for (const pending of snapshot) {
       if (now < pending.expireAtMs) continue;
       // Defer expiry for orders that have MATCHED but are awaiting MINED.
       // Cancelling here would race against the in-flight settlement — the
@@ -633,6 +635,7 @@ export class MarketLifecycle {
       shares,
       fee,
       tokenId: pending.tokenId,
+      status: "filled",
     });
     this._removePendingOrder(pending.orderId);
     this._marketLogger.log(
@@ -741,7 +744,7 @@ export class MarketLifecycle {
                 const actualBalance = parseInt(balMatch[1]!, 10);
                 const orderAmount = parseInt(balMatch[2]!, 10);
                 if (actualBalance > 0 && actualBalance < orderAmount) {
-                  item.req.shares = actualBalance / 1e6;
+                  item.req.shares = Math.max(1, Math.floor(actualBalance / 1e6));
                 }
               }
               retryNext.push(item);
@@ -943,9 +946,14 @@ export class MarketLifecycle {
     if (!this._marketPriceHandle) {
       this._marketPriceHandle = this.apiQueue.queueMarketPrice(slot);
     }
+    const deadline = Date.now() + 120_000;
     while (true) {
       const data = this.apiQueue.marketResult.get(slot.startTime);
-      if (data?.closePrice) return;
+      if (data?.closePrice != null) return;
+      if (Date.now() > deadline) {
+        this._log(`[${this.slug}] Resolution timeout (120s) — forcing DONE`, "red");
+        return;
+      }
       await new Promise((r) => setTimeout(r, 1000));
     }
   }
@@ -967,9 +975,14 @@ export class MarketLifecycle {
     const slot = slotFromSlug(this.slug);
     const data = this.apiQueue.marketResult.get(slot.startTime);
 
-    if (data?.closePrice) {
+    if (data?.closePrice != null) {
       const resolvedUp = data.closePrice > data.openPrice;
-      const upToken = this._clobTokenIds![0];
+      const upToken = this._clobTokenIds?.[0];
+      if (!upToken) {
+        this._pnl = parseFloat(pnl.toFixed(4));
+        this._log(`[${this.slug}] Settled (no clobTokenIds). PnL: ${this._pnl >= 0 ? "+" : ""}$${this._pnl.toFixed(2)}`, "yellow");
+        return;
+      }
       let unfilledShares = 0;
       let payout = 0;
 

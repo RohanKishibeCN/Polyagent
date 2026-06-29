@@ -50,11 +50,16 @@ export class APIQueue {
   }
 
   async queueEventDetails(slug: string) {
-    const res = await fetchWithRetry(
-      `https://gamma-api.polymarket.com/events?slug=${slug}`,
-    );
-    const event: EventResponse = ((await res.json()) as any[])[0];
-    this.eventResponse.set(slug, event);
+    try {
+      const res = await fetchWithRetry(
+        `https://gamma-api.polymarket.com/events?slug=${slug}`,
+      );
+      const event: EventResponse = ((await res.json()) as any[])[0];
+      this.eventResponse.set(slug, event);
+    } catch (e) {
+      console.error(`[api-queue] Failed to fetch event details for ${slug}: ${e}`);
+      this.eventResponse.set(slug, {} as EventResponse);
+    }
   }
 
   queueMarketPrice(slot: Slot): { cancel: () => void } {

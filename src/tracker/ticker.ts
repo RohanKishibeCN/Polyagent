@@ -1,4 +1,5 @@
 import { Env } from "../utils/config";
+import { Config } from "../config";
 import {
   createReconnectingWs,
   type ReconnectingWs,
@@ -34,19 +35,27 @@ export class TickerTracker {
   private _priceHistory: number[] = [];
   private _atrHistory: number[] = [];
   private _atrValue = 0;
+  private _lastATRSource: number | null = null;
 
   get atr() { return this._atrValue; }
 
   get isHighVolatility(): boolean { return this._atrValue > 8; }
 
   get marketState(): "OSCILLATING" | "TRENDING" | "HOT" | "KILLSWITCH" {
+    const cfg = Config.get();
     if (this.isKillswitch) return "KILLSWITCH";
-    if (this._atrValue < 1.5) return "OSCILLATING";
-    if (this._atrValue > 6) return "HOT";
+    if (this._atrValue < cfg.ATR_OSCILLATE_MAX) return "OSCILLATING";
+    if (this._atrValue > cfg.ATR_HOT_MIN) return "HOT";
     return "TRENDING";
   }
 
   private _updateATR(price: number): void {
+    if (this._lastATRSource !== null && Math.abs(price - this._lastATRSource) > 50) {
+      // Cross-source price jump (e.g. Binance→Coinbase) — skip ATR update
+      this._lastATRSource = price;
+      return;
+    }
+    this._lastATRSource = price;
     this._priceHistory.push(price);
     if (this._priceHistory.length > 14) this._priceHistory.shift();
     if (this._priceHistory.length < 2) return;

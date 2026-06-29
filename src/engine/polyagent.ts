@@ -16,6 +16,7 @@ import {
 import { WalletTracker } from "./wallet-tracker.ts";
 import { TickerTracker } from "../tracker/ticker";
 import { Env } from "../utils/config.ts";
+import { Config } from "../config";
 import { NotionScheduler } from "../notion/scheduler";
 
 const SAVE_INTERVAL_MS = 5000;
@@ -62,7 +63,7 @@ export class Polyagent {
     this._strategy = strategies[this._strategyName]!;
     this._slotOffset = slotOffset;
     this._alwaysLog = alwaysLog;
-    this._minSessionPnl = parseFloat(process.env.MAX_SESSION_LOSS ?? "3");
+    this._minSessionPnl = Config.get().MAX_SESSION_LOSS;
     if (prod) {
       this._client = new PolymarketEarlyBirdClient();
     } else {
@@ -126,7 +127,7 @@ export class Polyagent {
         process.exit(1);
       }
     } else {
-      initialBalance = parseFloat(process.env.WALLET_BALANCE ?? "50");
+      initialBalance = Config.get().WALLET_BALANCE;
       log.write(`[startup] Sim balance: $${initialBalance.toFixed(2)}`);
     }
     this._tracker = new WalletTracker(initialBalance, (msg) =>
@@ -321,6 +322,7 @@ export class Polyagent {
     saveState(this._statePath, {
       sessionPnl: this._sessionPnl,
       sessionLoss: this._sessionLoss,
+      startedAt: new Date().toISOString(),
       activeMarkets,
       completedMarkets: this._completedMarkets,
     });
