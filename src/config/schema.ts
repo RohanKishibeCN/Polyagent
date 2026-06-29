@@ -69,7 +69,7 @@ export const ConfigSchema = z.object({
   SIM_DELAY_MS: z.coerce.number().int().nonnegative().optional(),
   SIM_BALANCE_DELAY_MS: z.coerce.number().int().positive().default(4000),
 
-  ORDERBOOK_WS_URL: z.string().url().optional(),
+  ORDERBOOK_WS_URL: z.string().optional().default(""),
   POLYGON_RPC_URLS: z.preprocess(
     (v) => (typeof v === "string" ? v.split(",").map(s => s.trim()) : v),
     z.array(z.string().url())
@@ -81,7 +81,7 @@ export const ConfigSchema = z.object({
   FORCE_PROD: z.preprocess((v) => v === "true", z.boolean().default(false)),
   LOCK_DIR: z.string().default("state"),
   HEALTH_PORT: z.coerce.number().int().default(4173),
-  GLOBAL_PROXY_URL: z.string().url().optional(),
+  GLOBAL_PROXY_URL: z.string().optional().default(""),
 
   NOTION_API_KEY: z.string().optional().default(""),
   NOTION_DATABASE_ID: z.string().optional().default(""),
