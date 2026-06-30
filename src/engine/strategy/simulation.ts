@@ -23,12 +23,11 @@ export const simulationStrategy: Strategy = async (ctx) => {
   // changes to the strategy logic as per your needs.
   if (Env.get("PROD")) {
     ctx.log(
-      "[simulation] This strategy is specially designed for simulation only. " +
-        "If you still want to run it in production, remove this guard and make " +
-        "the necessary changes to the strategy logic as per your needs.",
-      "red",
+      "[simulation] This strategy is designed for simulation only. " +
+        "Skipping all trades in production mode.",
+      "yellow",
     );
-    process.exit(1);
+    return () => {};
   }
 
   // clobTokenIds[0] = UP side token, clobTokenIds[1] = DOWN side token.

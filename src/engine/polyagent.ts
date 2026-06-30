@@ -31,6 +31,7 @@ export class Polyagent {
   private _sessionLoss = 0;
   private _shuttingDown = false;
   private _lastSaveMs = 0;
+  private _tickInterval: ReturnType<typeof setInterval> | null = null;
   private readonly _strategyName: string;
   private readonly _strategy: Strategy;
   private readonly _slotOffset: number;
@@ -124,7 +125,8 @@ export class Polyagent {
           "Wallet balance is $0.00. Fund your funder wallet with pUSD before starting the engine.\n" +
           "Run `npx tsx scripts/pusd.ts wrap` to convert USDC.e → pUSD, or see docs/MIGRATE_V2.md.",
         );
-        process.exit(1);
+        this._shuttingDown = true;
+        return;
       }
     } else {
       initialBalance = Config.get().WALLET_BALANCE;
@@ -147,11 +149,11 @@ export class Polyagent {
       if (Math.abs(this._sessionLoss) >= this._minSessionPnl) {
         log.write(
           `[startup] Session loss from previous session ($${this._sessionLoss.toFixed(2)}) already meets or exceeds the MAX_SESSION_LOSS threshold (-$${this._minSessionPnl.toFixed(2)}). ` +
-            `The engine would shut down immediately. ` +
-            `To start fresh, reset "sessionLoss" to 0 in ${this._statePath}, or increase MAX_SESSION_LOSS in your .env.`,
-          "red",
+            `For PM2 compatibility, sessionLoss will be reset so trading can resume. ` +
+            `To prevent this, increase MAX_SESSION_LOSS in your .env.`,
+          "yellow",
         );
-        process.exit(1);
+        this._sessionLoss = 0;
       }
 
       if (!this._prod) {
@@ -198,7 +200,7 @@ export class Polyagent {
     process.on("SIGTERM", () => onSignal("SIGTERM"));
 
     this._notionScheduler.start();
-    setInterval(() => this._tick(), 100);
+    this._tickInterval = setInterval(() => this._tick(), 100);
   }
 
   private _tick(): void {
@@ -277,10 +279,14 @@ export class Polyagent {
     }
 
     if (this._shuttingDown && this._lifecycles.size === 0) {
-      log.write("[shutdown] All settled. Exiting.", "dim");
+      log.write("[shutdown] All settled. Engine idle.", "dim");
+      log.flush();
       this._saveState();
+      if (this._tickInterval) {
+        clearInterval(this._tickInterval);
+        this._tickInterval = null;
+      }
       this._ticker.destroy();
-      process.exit(0);
     }
   }
 

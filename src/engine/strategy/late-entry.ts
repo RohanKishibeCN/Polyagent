@@ -225,6 +225,7 @@ function getATRMax(): number { return Config.get().LATE_ENTRY_ATR_MAX; }
 function getCertaintyMin(): number { return Config.get().LATE_ENTRY_CERTAINTY; }
 function getMinLiquidity(): number { return Config.get().LATE_ENTRY_MIN_LIQUIDITY; }
 function getConfigPeakGap(): number { return Config.get().LATE_ENTRY_PEAK_GAP_RATIO; }
+function getSLPct(): number { return Config.get().LATE_ENTRY_SL_PCT; }
 
 import { Config } from "../../config";
 
@@ -282,7 +283,7 @@ function checkEntry(params: {
         ask: info.price,
         gap: absGap,
         liquidity: info.liquidity,
-        stopLossPrice: 0.48,
+        stopLossPrice: parseFloat((info.price * (1 - getSLPct())).toFixed(2)),
       };
     }
   }
@@ -425,12 +426,9 @@ export const lateEntry: Strategy = async (ctx) => {
   // changes to the strategy logic as per your needs.
   if (Env.get("PROD")) {
     ctx.log(
-      "[late-entry] This strategy is specially designed for simulation only. " +
-        "If you still want to run it in production, remove this guard and make " +
-        "the necessary changes to the strategy logic as per your needs.",
-      "red",
+      "[late-entry] Running in production mode. PROD guard removed — trade at your own risk.",
+      "yellow",
     );
-    process.exit(1);
   }
 
   // ── ctx.hold() ────────────────────────────────────────────────────────────

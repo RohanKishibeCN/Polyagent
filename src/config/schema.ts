@@ -33,6 +33,7 @@ export const ConfigSchema = z.object({
   LATE_ENTRY_ATR_MAX: z.coerce.number().positive().default(2),
   LATE_ENTRY_CERTAINTY: z.coerce.number().min(0.5).max(0.99).default(0.85),
   LATE_ENTRY_MIN_LIQUIDITY: z.coerce.number().positive().default(20),
+  LATE_ENTRY_SL_PCT: z.coerce.number().min(0.01).max(0.5).default(0.15),
 
   ATR_OSCILLATE_MAX: z.coerce.number().positive().default(1.5),
   ATR_HOT_MIN: z.coerce.number().positive().default(6.0),
