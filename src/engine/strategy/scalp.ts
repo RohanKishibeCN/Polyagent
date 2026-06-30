@@ -31,18 +31,20 @@ export const scalpStrategy: Strategy = async (ctx) => {
   const entryMin = cfg.SCALP_ENTRY_MIN;
   const entryMax = cfg.SCALP_ENTRY_MAX;
 
-  function calcPositionSize(): number {
+  function calcPositionSize(price: number): number {
     const balance = ctx.walletAvailable;
     if (balance <= 0) return 1;
 
-    const rawAtr = ctx.ticker.atr || 3;
-    const atr = Math.max(0.5, rawAtr);
-    const volRatio = Math.min(1.5, atr / 3.0);
+    const rawAtr = ctx.ticker.atr;
+    const volRatio = rawAtr > 0
+      ? Math.min(1.5, Math.max(0.2, rawAtr / 3.0))
+      : 0.2;
 
-    const riskBased = balance * cfg.POSITION_PCT * volRatio;
-    const capped = Math.min(riskBased, cfg.MAX_POSITION_USD);
+    const riskUSD = balance * cfg.POSITION_PCT * volRatio;
+    const cappedUSD = Math.min(riskUSD, cfg.MAX_POSITION_USD);
+    const shares = Math.floor(cappedUSD / price);
 
-    return Math.max(1, Math.round(capped));
+    return Math.max(1, shares);
   }
 
   function tryScalp(): void {
@@ -84,7 +86,7 @@ export const scalpStrategy: Strategy = async (ctx) => {
       return;
     }
 
-    const shares = calcPositionSize();
+    const shares = calcPositionSize(entryPrice);
     tradesThisWindow++;
 
     ctx.log(`[scalp] #${tradesThisWindow} BUY ${side} @ ${entryPrice} (${shares} shares, ATR: ${ctx.ticker.atr.toFixed(2)})`, "cyan");
