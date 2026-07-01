@@ -13,6 +13,9 @@ export const scalpStrategy: Strategy = async (ctx) => {
   const upTokenId = ctx.clobTokenIds[0];
   const downTokenId = ctx.clobTokenIds[1];
 
+  type Position = { entryPrice: number; shares: number; tokenId: string };
+  const positions: Position[] = [];
+
   const marketOpenMs = ctx.slotEndMs - 300_000;
   const msUntilOpen = marketOpenMs - Date.now();
 
@@ -30,6 +33,17 @@ export const scalpStrategy: Strategy = async (ctx) => {
   const spreadMax = cfg.SCALP_SPREAD_MAX;
   const entryMin = cfg.SCALP_ENTRY_MIN;
   const entryMax = cfg.SCALP_ENTRY_MAX;
+
+  function exitAllPositions(reason: string): void {
+    const pendingSellIds = ctx.pendingOrders
+      .filter((o) => o.action === "sell")
+      .map((o) => o.orderId);
+    if (pendingSellIds.length > 0) {
+      ctx.log(`[scalp] ${reason}`, "red");
+      ctx.emergencySells(pendingSellIds);
+      positions.length = 0;
+    }
+  }
 
   function calcPositionSize(price: number): number {
     const balance = ctx.walletAvailable;
@@ -49,6 +63,23 @@ export const scalpStrategy: Strategy = async (ctx) => {
 
   function tryScalp(): void {
     if (!active) return;
+
+    // ── Monitor existing positions for stop-loss ─────────────────────────────
+    if (positions.length > 0) {
+      const bestBidUp = ctx.orderBook.bestBidInfo("UP")?.price;
+      const bestBidDown = ctx.orderBook.bestBidInfo("DOWN")?.price;
+
+      for (const pos of positions) {
+        const bid = pos.tokenId === upTokenId ? bestBidUp : bestBidDown;
+        if (bid != null && bid < pos.entryPrice - slDelta) {
+          exitAllPositions(
+            `Stop-loss: bid ${bid.toFixed(3)} < entry ${pos.entryPrice.toFixed(2)} - ${slDelta.toFixed(2)}`,
+          );
+          return;
+        }
+      }
+    }
+
     if (tradesThisWindow >= maxPerWindow) return;
     if (consecutiveLosses >= maxConsecLoss) {
       ctx.log("[scalp] Consecutive loss limit reached — stopping for this window", "yellow");
@@ -74,17 +105,22 @@ export const scalpStrategy: Strategy = async (ctx) => {
     let tokenId: string;
     let entryPrice: number;
 
-    if (bestAskUp.price >= entryMin && bestAskUp.price <= entryMax && spreadUp <= spreadMax) {
+    const upInRange = bestAskUp.price >= entryMin && bestAskUp.price <= entryMax && spreadUp <= spreadMax;
+    const downInRange = bestAskDown.price >= entryMin && bestAskDown.price <= entryMax && spreadDown <= spreadMax;
+
+    if (!upInRange && !downInRange) return;
+
+    if (upInRange && downInRange) {
+      // Both sides in range — pick at random to avoid UP bias
+      side = Math.random() < 0.5 ? "UP" : "DOWN";
+    } else if (upInRange) {
       side = "UP";
-      tokenId = upTokenId;
-      entryPrice = bestAskUp.price;
-    } else if (bestAskDown.price >= entryMin && bestAskDown.price <= entryMax && spreadDown <= spreadMax) {
-      side = "DOWN";
-      tokenId = downTokenId;
-      entryPrice = bestAskDown.price;
     } else {
-      return;
+      side = "DOWN";
     }
+
+    tokenId = side === "UP" ? upTokenId : downTokenId;
+    entryPrice = side === "UP" ? bestAskUp.price : bestAskDown.price;
 
     const shares = calcPositionSize(entryPrice);
     tradesThisWindow++;
@@ -102,11 +138,12 @@ export const scalpStrategy: Strategy = async (ctx) => {
       expireAtMs: ctx.slotEndMs - 30_000,
 
       onFilled(filledShares) {
+        positions.push({ entryPrice, shares: filledShares, tokenId });
+
         const tpPrice = parseFloat((entryPrice + tpDelta).toFixed(2));
-        const slPrice = parseFloat((entryPrice - slDelta).toFixed(2));
         const exitExpireMs = ctx.slotEndMs - 30_000;
 
-        ctx.log(`[scalp] #${tradesThisWindow} BUY filled ${filledShares} shares — placing TP @ ${tpPrice}, SL @ ${slPrice}`, "green");
+        ctx.log(`[scalp] #${tradesThisWindow} BUY filled ${filledShares} shares — TP @ ${tpPrice}`, "green");
 
         ctx.postOrders([{
           req: {
@@ -122,32 +159,14 @@ export const scalpStrategy: Strategy = async (ctx) => {
             consecutiveLosses = 0;
           },
           onExpired() {
-            ctx.log(`[scalp] #${tradesThisWindow} TP order expired — emergency selling`, "yellow");
-            const pendingSellIds = ctx.pendingOrders
-              .filter((o) => o.action === "sell")
-              .map((o) => o.orderId);
-            if (pendingSellIds.length > 0) {
-              ctx.emergencySells(pendingSellIds);
-            }
+            ctx.log(`[scalp] #${tradesThisWindow} TP expired — emergency exit`, "yellow");
+            exitAllPositions("TP expired, exiting all positions");
           },
           onFailed(reason) {
-            ctx.log(`[scalp] #${tradesThisWindow} sell failed: ${reason}`, "red");
+            ctx.log(`[scalp] #${tradesThisWindow} TP sell failed: ${reason}`, "red");
             consecutiveLosses++;
           },
         }]);
-
-        const msUntilEmergency = ctx.slotEndMs - 30_000 - Date.now();
-        if (msUntilEmergency > 0) {
-          timers.push(setTimeout(() => {
-            const pendingSellIds = ctx.pendingOrders
-              .filter((o) => o.action === "sell")
-              .map((o) => o.orderId);
-            if (pendingSellIds.length > 0) {
-              ctx.log("[scalp] Emergency exit triggered", "red");
-              ctx.emergencySells(pendingSellIds);
-            }
-          }, msUntilEmergency));
-        }
       },
 
       onExpired() {
